@@ -175,10 +175,9 @@ class SX127x(BaseLoRa) :
     _onTransmit = None
     _onReceive = None
 
-    def __init__(self, spi: LoRaSpi, cs: LoRaGpio, reset: LoRaGpio, irq: Optional[LoRaGpio]=None, txen: Optional[LoRaGpio]=None, rxen: Optional[LoRaGpio]=None):
+    def __init__(self, spi: LoRaSpi, reset: LoRaGpio, irq: Optional[LoRaGpio]=None, txen: Optional[LoRaGpio]=None, rxen: Optional[LoRaGpio]=None):
 
         self._spi = spi
-        self._cs = cs
         self._reset = reset
         self._irq = irq
         self._txen = txen
@@ -803,9 +802,7 @@ class SX127x(BaseLoRa) :
     def _transfer(self, address: int, data: int) -> int :
 
         buf = [address, data]
-        self._cs.output(LoRaGpio.LOW)
         feedback = self._spi.transfer(buf)
-        self._cs.output(LoRaGpio.HIGH)
         if (len(feedback) == 2) :
             return int(feedback[1])
         return -1

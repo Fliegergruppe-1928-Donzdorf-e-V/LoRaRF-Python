@@ -9,9 +9,9 @@ class LoRaSpi():
 
     SPI_SPEED = 8000000
 
-    def __init__(self, bus: int, cs: int, speed: int = SPI_SPEED):
+    def __init__(self, bus: int, device: int, speed: int = SPI_SPEED):
         self.bus = bus
-        self.cs = cs
+        self.cs = device
         self.speed = speed
 
     def transfer(self, buf: Iterable) -> tuple:
@@ -25,6 +25,7 @@ class LoRaSpi():
         return ret
 
 
+
 class LoRaGpio:
 
     LOW = Value.INACTIVE
@@ -36,35 +37,61 @@ class LoRaGpio:
         self.seqno = 0
 
     def output(self, value: Value):
-        with gpiod.request_lines(
-            self.chip,
-            consumer="LoRaGpio",
-            config={self.offset: gpiod.LineSettings(direction=Direction.OUTPUT)}
-        ) as request:
-            request.set_value(self.offset, value)
+        self.request.set_value(self.offset, value)
 
     def input(self):
-        with gpiod.request_lines(
-            self.chip,
-            consumer="LoRaGpio",
-            config={self.offset: gpiod.LineSettings(direction=Direction.INPUT)}
-        ) as request:
-            return request.get_value(self.offset)
+        return self.request.get_value(self.offset)
 
     def monitor(self, callback, timeout: float):
-        t = time.time()
-        with gpiod.request_lines(
-            self.chip,
-            consumer="LoRaGpio",
-            config={self.offset: gpiod.LineSettings(edge_detection=Edge.RISING)}
-        ) as request:
-            while (time.time() - t) < timeout or timeout == 0:
-                for event in request.read_edge_events():
-                    if event.line_seqno != self.seqno:
-                        self.seqno = event.line_seqno
-                        callback()
-                        return
+        t = time.time()        
+        while (time.time() - t) < timeout or timeout == 0:
+            for event in self.request.read_edge_events():
+                if event.line_seqno != self.seqno:
+                    self.seqno = event.line_seqno
+                    callback()
+                    return
 
+class LoRaGpioOut(LoRaGpio):
+
+    def __enter__(self):
+        print(f"enter |{self.chip} {self.offset}")
+        self.request = gpiod.request_lines(
+            self.chip,
+            consumer="LoRaGpioOut",
+            config={self.offset: gpiod.LineSettings(direction=Direction.OUTPUT)}
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(f"exit |{self.chip} {self.offset}")
+        self.request.release()
+    def blubb():
+        print("blugg")
+
+class LoRaGpioIn(LoRaGpio):
+
+    def __enter__(self):
+        self.request = gpiod.request_lines(
+            self.chip,
+            consumer="LoRaGpioOut",
+            config={self.offset: gpiod.LineSettings(direction=Direction.INPUT)}
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.request.release()
+
+class LoRaGpioIrq(LoRaGpio):
+    def __enter__(self):
+        self.request = gpiod.request_lines(
+            self.chip,
+            consumer="LoRaGpioOut",
+            config={self.offset: gpiod.LineSettings(edge_detection=Edge.RISING)}
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.request.release()
 
 class BaseLoRa :
 
